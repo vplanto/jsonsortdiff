@@ -11,6 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "jsdifflib": "^1.1.0",
-    "jsonabc": "^2.3.1"
+    "jsonabc": "^2.3.1",
+    "uglify-js": "^3.19.3"
   }
 }

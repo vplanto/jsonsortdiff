@@ -31,11 +31,7 @@
   <body>
     <h1>JSON ABC and Diff</h1>
 
-    <form onsubmit="appSort(event, 't1', 't2')">
-      <div class="texts">
-        <input type="text" class="text" placeholder="name" />
-        <input type="text" class="text" placeholder="name" />
-      </div>
+    <form onsubmit="appSort(event, 't1', 't2', 'file1', 'file2')">
       <div class="boxes">
         <textarea
           id="t1"
@@ -44,8 +40,7 @@
           placeholder="Paste your first unsorted JSON here"
           aria-label="Paste your first JSON here"
           spellcheck="false"
-          required
-          aria-required="true"
+          aria-required="false"
         ></textarea>
         <textarea
           id="t2"
@@ -54,9 +49,12 @@
           placeholder="Paste your second unsorted JSON here"
           aria-label="Paste your second JSON here"
           spellcheck="false"
-          required
-          aria-required="true"
+          aria-required="false"
         ></textarea>
+      </div>
+      <div class="boxes">
+        <input type="file" id="file1" class="file" name="jsonfile1"/>
+        <input type="file" id="file2" class="file" name="jsonfile2"/>
       </div>
       <div>
         <input

@@ -21,7 +21,8 @@ function diffDisplay(str1, str2) {
     // set the display titles for each resource
     baseTextName: "Base Text",
     newTextName: "New Text",
-    contextSize: 10
+    contextSize: 2,
+    inline: true
     //set inine to true if you want inline
     //rather than side by side diff
   });
@@ -32,27 +33,67 @@ function diffDisplay(str1, str2) {
   location.hash = "#diff";
 }
 
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+  });
+}
+
 // app sorting
-function appSort(ev, tid1, tid2) {
+function appSort(ev, tid1, tid2, fileid1, fileid2) {
   ev.preventDefault();
 
   var inputStr1, inputStr2, sortStr1, sortStr2;
 
-  inputStr1 = document.getElementById(tid1).value;
-  inputStr2 = document.getElementById(tid2).value;
+  const file1 = document.getElementById(fileid1).files[0];
+  const file2 = document.getElementById(fileid2).files[0];
 
-  try {
-    sortStr1 = jsonabc.sort(inputStr1);
-    sortStr2 = jsonabc.sort(inputStr2);
+  if (file1 && file2) {
+      readFile(file1).then(result1 => {
+          inputStr1 = result1;
+          return readFile(file2);
+      }).then(result2 => {
+          inputStr2 = result2;
 
-    document.getElementById(tid1).value = sortStr1;
-    document.getElementById(tid2).value = sortStr2;
+          try {
+              sortStr1 = jsonabc.sort(inputStr1);
+              sortStr2 = jsonabc.sort(inputStr2);
 
-    window.setTimeout(function() {
-      diffDisplay(sortStr1, sortStr2);
-    });
-  } catch (ex) {
-    window.alert("Incorrect JSON object");
+              document.getElementById(tid1).value = sortStr1;
+              document.getElementById(tid2).value = sortStr2;
+
+              window.setTimeout(function() {
+                  diffDisplay(sortStr1, sortStr2);
+              });
+          } catch (ex) {
+              window.alert("Incorrect JSON object");
+          }
+      }).catch(error => {
+          console.error('Error reading files:', error);
+      });
+  } else {
+      inputStr1 = document.getElementById(tid1).value;
+      inputStr2 = document.getElementById(tid2).value;
+
+      // Process the input strings directly if no files are selected
+      try {
+          console.log("inputStr1", inputStr1);
+          console.log("inputStr2", inputStr2);
+          sortStr1 = jsonabc.sort(inputStr1);
+          sortStr2 = jsonabc.sort(inputStr2);
+
+          document.getElementById(tid1).value = sortStr1;
+          document.getElementById(tid2).value = sortStr2;
+
+          window.setTimeout(function() {
+              diffDisplay(sortStr1, sortStr2);
+          });
+      } catch (ex) {
+          window.alert("Incorrect JSON object");
+      }
   }
 }
 
