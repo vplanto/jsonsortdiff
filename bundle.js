@@ -288,26 +288,32 @@ var difflib = module.exports = {
     }
     
     this.find_longest_match = function (alo, ahi, blo, bhi) {
-      var a = this.a;
-      var b = this.b;
-      var b2j = this.b2j;
-      var isbjunk = this.isbjunk;
-      var besti = alo;
-      var bestj = blo;
-      var bestsize = 0;
-      var j = null;
-  
-      var j2len = {};
-      var nothing = [];
-      for (var i = alo; i < ahi; i++) {
-        var newj2len = {};
-        var jdict = difflib.__dictget(b2j, a[i], nothing);
-        for (var jkey in jdict) {
-          if (jdict.hasOwnProperty(jkey)) {
-            j = jdict[jkey];
+      const CHUNK_SIZE = 1000; // Process inputs in chunks of this size
+      const a = this.a;
+      const b = this.b;
+      const b2j = this.b2j;
+      const isbjunk = this.isbjunk;
+    
+      let besti = alo;
+      let bestj = blo;
+      let bestsize = 0;
+    
+      // Process `a` in chunks
+      for (let chunkStart = alo; chunkStart < ahi; chunkStart += CHUNK_SIZE) {
+        const chunkEnd = Math.min(chunkStart + CHUNK_SIZE, ahi);
+        const j2len = []; // Use a sparse array instead of initializing with `fill`
+    
+        for (let i = chunkStart; i < chunkEnd; i++) {
+          const ai = a[i]; // Cache `a[i]` to avoid repeated lookups
+          const jdict = b2j[ai] || []; // Avoid `__dictget` for better performance
+    
+          for (let j of jdict) {
             if (j < blo) continue;
             if (j >= bhi) break;
-            newj2len[j] = k = difflib.__dictget(j2len, j - 1, 0) + 1;
+    
+            const k = (j2len[j - blo - 1] || 0) + 1; // Use sparse array indexing
+            j2len[j - blo] = k; // Update the sparse array directly
+    
             if (k > bestsize) {
               besti = i - k + 1;
               bestj = j - k + 1;
@@ -315,106 +321,77 @@ var difflib = module.exports = {
             }
           }
         }
-        j2len = newj2len;
       }
-  
-      while (besti > alo && bestj > blo && !isbjunk(b[bestj - 1]) && a[besti - 1] == b[bestj - 1]) {
-        besti--;
-        bestj--;
-        bestsize++;
-      }
-        
-      while (besti + bestsize < ahi && bestj + bestsize < bhi &&
-          !isbjunk(b[bestj + bestsize]) &&
-          a[besti + bestsize] == b[bestj + bestsize]) {
-        bestsize++;
-      }
-  
-      while (besti > alo && bestj > blo && isbjunk(b[bestj - 1]) && a[besti - 1] == b[bestj - 1]) {
-        besti--;
-        bestj--;
-        bestsize++;
-      }
-      
-      while (besti + bestsize < ahi && bestj + bestsize < bhi && isbjunk(b[bestj + bestsize]) &&
-          a[besti + bestsize] == b[bestj + bestsize]) {
-        bestsize++;
-      }
-  
-      return [besti, bestj, bestsize];
-    }
     
+      // Extend the best match backward and forward
+      while (besti > alo && bestj > blo && !isbjunk(b[bestj - 1]) && a[besti - 1] === b[bestj - 1]) {
+        besti--;
+        bestj--;
+        bestsize++;
+      }
+    
+      while (besti + bestsize < ahi && bestj + bestsize < bhi &&
+             !isbjunk(b[bestj + bestsize]) &&
+             a[besti + bestsize] === b[bestj + bestsize]) {
+        bestsize++;
+      }
+    
+      return [besti, bestj, bestsize];
+    };
+
     this.get_matching_blocks = function () {
       if (this.matching_blocks != null) return this.matching_blocks;
-      var la = this.a.length;
-      var lb = this.b.length;
-  
-      var queue = [[0, la, 0, lb]];
-      var matching_blocks = [];
-      var alo, ahi, blo, bhi, qi, i, j, k, x;
-      while (queue.length) {
-        qi = queue.pop();
-        alo = qi[0];
-        ahi = qi[1];
-        blo = qi[2];
-        bhi = qi[3];
-        x = this.find_longest_match(alo, ahi, blo, bhi);
-        i = x[0];
-        j = x[1];
-        k = x[2];
-  
-        if (k) {
-          matching_blocks.push(x);
-          if (alo < i && blo < j)
-            queue.push([alo, i, blo, j]);
-          if (i+k < ahi && j+k < bhi)
-            queue.push([i + k, ahi, j + k, bhi]);
+    
+      const la = this.a.length;
+      const lb = this.b.length;
+      const queue = [[0, la, 0, lb]];
+      const matching_blocks = [];
+    
+      while (queue.length > 0) {
+        const [alo, ahi, blo, bhi] = queue.pop();
+        const [i, j, k] = this.find_longest_match(alo, ahi, blo, bhi);
+    
+        if (k > 0) {
+          matching_blocks.push([i, j, k]);
+    
+          // Add unmatched regions to the queue
+          if (alo < i && blo < j) queue.push([alo, i, blo, j]);
+          if (i + k < ahi && j + k < bhi) queue.push([i + k, ahi, j + k, bhi]);
         }
       }
-      
-      matching_blocks.sort(difflib.__ntuplecomp);
-  
-      var i1 = j1 = k1 = block = 0;
-      var non_adjacent = [];
-      for (var idx in matching_blocks) {
-        if (matching_blocks.hasOwnProperty(idx)) {
-          block = matching_blocks[idx];
-          i2 = block[0];
-          j2 = block[1];
-          k2 = block[2];
-          if (i1 + k1 == i2 && j1 + k1 == j2) {
-            k1 += k2;
-          } else {
-            if (k1) non_adjacent.push([i1, j1, k1]);
-            i1 = i2;
-            j1 = j2;
-            k1 = k2;
-          }
-        }
-      }
-      
-      if (k1) non_adjacent.push([i1, j1, k1]);
-  
-      non_adjacent.push([la, lb, 0]);
-      this.matching_blocks = non_adjacent;
+    
+      // Sort matching blocks by their start positions
+      matching_blocks.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    
+      // Add a final dummy block
+      matching_blocks.push([la, lb, 0]);
+    
+      this.matching_blocks = matching_blocks;
       return this.matching_blocks;
-    }
+    };
     
     this.get_opcodes = function () {
       if (this.opcodes != null) return this.opcodes;
-      var i = 0;
-      var j = 0;
-      var answer = [];
+    
+      const CHUNK_SIZE = 1000; // Process inputs in chunks of this size
+      let i = 0;
+      let j = 0;
+      const answer = [];
       this.opcodes = answer;
-      var block, ai, bj, size, tag;
-      var blocks = this.get_matching_blocks();
-      for (var idx in blocks) {
-        if (blocks.hasOwnProperty(idx)) {
-          block = blocks[idx];
-          ai = block[0];
-          bj = block[1];
-          size = block[2];
-          tag = '';
+    
+      const blocks = this.get_matching_blocks();
+    
+      // Process blocks in chunks
+      for (let idx = 0; idx < blocks.length; idx += CHUNK_SIZE) {
+        const chunk = blocks.slice(idx, idx + CHUNK_SIZE);
+    
+        for (let blockIdx = 0; blockIdx < chunk.length; blockIdx++) {
+          const block = chunk[blockIdx];
+          const ai = block[0];
+          const bj = block[1];
+          const size = block[2];
+          let tag = '';
+    
           if (i < ai && j < bj) {
             tag = 'replace';
           } else if (i < ai) {
@@ -422,16 +399,22 @@ var difflib = module.exports = {
           } else if (j < bj) {
             tag = 'insert';
           }
-          if (tag) answer.push([tag, i, ai, j, bj]);
+    
+          if (tag) {
+            answer.push([tag, i, ai, j, bj]);
+          }
+    
           i = ai + size;
           j = bj + size;
-          
-          if (size) answer.push(['equal', ai, i, bj, j]);
+    
+          if (size) {
+            answer.push(['equal', ai, i, bj, j]);
+          }
         }
       }
-      
+    
       return answer;
-    }
+    };
     
     // this is a generator function in the python lib, which of course is not supported in javascript
     // the reimplementation builds up the grouped opcodes into a list in their entirety and returns that.
